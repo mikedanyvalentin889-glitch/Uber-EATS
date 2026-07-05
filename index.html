@@ -41,14 +41,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     <!-- LOGIN -->
     <div id="login-form" class="w-full space-y-4">
       <div>
-        <input type="tel" id="login-phone" placeholder="Numero telephone" class="w-full bg-gray-100 rounded-xl px-4 py-3 outline-none text-gray-800">
+        <input type="tel" id="login-phone" placeholder="Numero telephone (ex: 34232552)" class="w-full bg-gray-100 rounded-xl px-4 py-3 outline-none text-gray-800">
       </div>
-      <div>
-        <input type="password" id="login-pass" placeholder="Mot de passe" class="w-full bg-gray-100 rounded-xl px-4 py-3 outline-none text-gray-800">
+      <div class="relative">
+        <input type="password" id="login-pass" placeholder="Mot de passe" class="w-full bg-gray-100 rounded-xl px-4 py-3 outline-none text-gray-800 pr-12">
+        <button onclick="toggleShowPass('login-pass')" class="absolute right-3 top-3 text-gray-400">👁️</button>
       </div>
       <p id="login-error" class="text-red-500 text-sm hidden"></p>
       <button onclick="login()" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold">Se connecter</button>
       <button onclick="showRegister()" class="w-full text-green-600 font-medium">Pas de compte ? S'inscrire</button>
+      <button onclick="clearAllData()" class="w-full text-gray-400 text-sm">🗑️ Reinitialiser (debug)</button>
     </div>
 
     <!-- REGISTER -->
@@ -57,10 +59,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         <input type="text" id="reg-name" placeholder="Prenom" class="w-full bg-gray-100 rounded-xl px-4 py-3 outline-none text-gray-800">
       </div>
       <div>
-        <input type="tel" id="reg-phone" placeholder="Numero telephone" class="w-full bg-gray-100 rounded-xl px-4 py-3 outline-none text-gray-800">
+        <input type="tel" id="reg-phone" placeholder="Numero (ex: 34232552)" class="w-full bg-gray-100 rounded-xl px-4 py-3 outline-none text-gray-800">
       </div>
-      <div>
-        <input type="password" id="reg-pass" placeholder="Mot de passe (min 4)" class="w-full bg-gray-100 rounded-xl px-4 py-3 outline-none text-gray-800">
+      <div class="relative">
+        <input type="password" id="reg-pass" placeholder="Mot de passe (min 4)" class="w-full bg-gray-100 rounded-xl px-4 py-3 outline-none text-gray-800 pr-12">
+        <button onclick="toggleShowPass('reg-pass')" class="absolute right-3 top-3 text-gray-400">👁️</button>
       </div>
       <p id="reg-error" class="text-red-500 text-sm hidden"></p>
       <button onclick="register()" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold">Creer compte</button>
@@ -309,7 +312,7 @@ function clearErrors() {
 }
 
 function login() {
-  const phone = document.getElementById('login-phone').value.trim();
+  const phone = document.getElementById('login-phone').value.trim().replace(/\s/g, '');
   const pass = document.getElementById('login-pass').value;
   const err = document.getElementById('login-error');
 
@@ -317,14 +320,32 @@ function login() {
   if (!pass) { err.textContent = 'Entre ton mot de passe'; err.classList.remove('hidden'); return; }
   if (pass.length < 4) { err.textContent = 'Mot de passe trop court (min 4)'; err.classList.remove('hidden'); return; }
 
+  // Try to find user by phone (normalize phone number)
   const saved = localStorage.getItem('manje_user');
   if (saved) {
-    const parsed = JSON.parse(saved);
-    if (parsed.phone !== phone) { err.textContent = 'Numero non enregistre'; err.classList.remove('hidden'); return; }
-    if (parsed.pass !== pass) { err.textContent = 'Mot de passe incorrect'; err.classList.remove('hidden'); return; }
-    user = parsed;
+    try {
+      const parsed = JSON.parse(saved);
+      const savedPhone = (parsed.phone || '').replace(/\s/g, '');
+      if (savedPhone !== phone) { 
+        err.textContent = 'Numero non enregistre. Inscris-toi !'; 
+        err.classList.remove('hidden'); 
+        return; 
+      }
+      if (parsed.pass !== pass) { 
+        err.textContent = 'Mot de passe incorrect'; 
+        err.classList.remove('hidden'); 
+        return; 
+      }
+      user = parsed;
+    } catch(e) {
+      err.textContent = 'Erreur. Inscris-toi a nouveau !'; 
+      err.classList.remove('hidden'); 
+      return;
+    }
   } else {
-    err.textContent = 'Aucun compte. Inscris-toi !'; err.classList.remove('hidden'); return;
+    err.textContent = 'Aucun compte trouve. Inscris-toi !'; 
+    err.classList.remove('hidden'); 
+    return;
   }
 
   showMain();
@@ -332,7 +353,7 @@ function login() {
 
 function register() {
   const name = document.getElementById('reg-name').value.trim();
-  const phone = document.getElementById('reg-phone').value.trim();
+  const phone = document.getElementById('reg-phone').value.trim().replace(/\s/g, '');
   const pass = document.getElementById('reg-pass').value;
   const err = document.getElementById('reg-error');
 
@@ -340,6 +361,20 @@ function register() {
   if (!phone) { err.textContent = 'Entre ton numero'; err.classList.remove('hidden'); return; }
   if (!pass) { err.textContent = 'Cree un mot de passe'; err.classList.remove('hidden'); return; }
   if (pass.length < 4) { err.textContent = 'Mot de passe trop court (min 4)'; err.classList.remove('hidden'); return; }
+
+  // Check if user already exists
+  const saved = localStorage.getItem('manje_user');
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      const savedPhone = (parsed.phone || '').replace(/\s/g, '');
+      if (savedPhone === phone) {
+        err.textContent = 'Ce numero est deja enregistre. Connecte-toi !';
+        err.classList.remove('hidden');
+        return;
+      }
+    } catch(e) {}
+  }
 
   user = { name: name, phone: phone, pass: pass };
   localStorage.setItem('manje_user', JSON.stringify(user));
@@ -359,6 +394,19 @@ function showMain() {
 function logout() {
   if (confirm('Deconnexion ?')) {
     localStorage.removeItem('manje_user');
+    location.reload();
+  }
+}
+
+function toggleShowPass(id) {
+  const input = document.getElementById(id);
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+function clearAllData() {
+  if (confirm('Effacer TOUTES les donnees ?')) {
+    localStorage.clear();
+    alert('Donnees effacees ! Recharge la page.');
     location.reload();
   }
 }
